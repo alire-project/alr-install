@@ -40,9 +40,15 @@ runs:
 
     - name: Set up alr
       if: steps.find-alr.outputs.available != 'true'
-      uses: alire-project/setup-alire@v3
+      uses: alire-project/setup-alire@v4
       with:
         cache: ${{inputs.cache}}
+
+    - name: Prepare alr version
+      id: alr-version
+      shell: bash
+      run: |
+        echo "version=$(alr --version)" >> $GITHUB_OUTPUT
 
     - name: Prepare --force
       id: force
@@ -69,7 +75,7 @@ runs:
       id: cache-key
       shell: bash
       run: |
-        echo "key=[alr-install][${{runner.os}}][${{runner.arch}}][${{inputs.prefix}}][${{steps.find-versions.outputs.milestones}}]" >> $GITHUB_OUTPUT
+        echo "key=[1][alr-install][alr=${{steps.alr-version.outputs.version}}][${{runner.os}}][${{runner.arch}}][${{inputs.prefix}}][${{steps.find-versions.outputs.milestones}}]" >> $GITHUB_OUTPUT
 
     - name: Reuse cached installation
       if: inputs.cache == 'true'
