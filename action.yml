@@ -28,6 +28,11 @@ inputs:
     required: false
     default: true
 
+outputs:
+  cache_hit:
+    description: Whether the cache was hit
+    value: ${{ steps.cache-output.outputs.cache_hit }}
+
 runs:
   using: "composite"
   steps:
@@ -75,7 +80,7 @@ runs:
       id: cache-key
       shell: bash
       run: |
-        echo "key=[1][alr-install][alr=${{steps.alr-version.outputs.version}}][${{runner.os}}][${{runner.arch}}][${{inputs.prefix}}][${{steps.find-versions.outputs.milestones}}]" >> $GITHUB_OUTPUT
+        echo "key=[2][alr-install][alr=${{steps.alr-version.outputs.version}}][${{runner.os}}][${{runner.arch}}][${{inputs.prefix}}][${{steps.find-versions.outputs.milestones}}]" >> $GITHUB_OUTPUT
 
     - name: Reuse cached installation
       if: inputs.cache == 'true'
@@ -86,11 +91,22 @@ runs:
           ${{inputs.prefix}}
         key: ${{steps.cache-key.outputs.key}}
 
+    # In case of miss, give an explicit 'false' which actions/cache doesn't provide
+    - name: Set cache_hit output
+      id: cache-output
+      shell: bash
+      run: |
+        if [[ "${{inputs.cache}}" == "true" && "${{steps.cache-install.outputs.cache-hit}}" == "true" ]]; then
+          echo "cache_hit=true" >> $GITHUB_OUTPUT
+        else
+          echo "cache_hit=false" >> $GITHUB_OUTPUT
+        fi
+
     - name: Diagnose cache usage
       shell: bash
       run: |
         echo "alr-install cache requested: ${{inputs.cache}}"
-        echo "alr-install cache hit: ${{steps.cache-install.outputs.cache-hit}}"
+        echo "alr-install cache hit: ${{steps.cache-output.outputs.cache_hit}}"
         echo "alr-install cache key: ${{steps.cache-key.outputs.key}}"
 
     - name: Run `alr install`
@@ -121,3 +137,26 @@ runs:
       if: inputs.clean == 'true' && steps.find-alr.outputs.available != 'true'
       shell: bash
       run: rm -rf alire_install
+
+    # Save cache early so we can verify its proper working in a test workflow. Otherwise
+    # it's not saved until workflow completion and by then it's too late.
+    # When cache was hit, attempting to save will fail and emit a warning, so avoid it.
+    - name: Cache save
+      if: ${{ inputs.cache == 'true' && steps.cache-install.outputs.cache-hit != 'true' }}
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          ${{inputs.prefix}}
+        key: ${{steps.cache-key.outputs.key}}
+
+    # Verify cache was saved properly
+    - name: Cache verify
+      if: ${{ inputs.cache == 'true' && steps.cache-install.outputs.cache-hit != 'true' }}
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          ${{inputs.prefix}}
+        key: ${{steps.cache-key.outputs.key}}
+        lookup-only: true
+        fail-on-cache-miss: false
+        # Even if the cache is not found, we don't want to fail here for clients
