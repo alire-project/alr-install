@@ -9,8 +9,8 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - macos-12
-          - macos-latest
+          - macos-13      # x64
+          - macos-latest  # arm64
           - ubuntu-latest
           - windows-latest
         cached:
