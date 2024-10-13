@@ -1,0 +1,67 @@
+name: Test cache
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test-cache:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-13      # x64
+          - macos-latest  # arm64
+          - ubuntu-latest
+          - windows-latest
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # This might hit cache
+
+      - name: Check action itself (attempt 1)
+        id: attempt_1
+        uses: ./
+        with:
+          crates: gprbuild hello
+          prefix: alire_prefix
+
+      # We want to later on test the pristine prefix restored from cache
+      - name: Clean prefix for next attempt
+        if: steps.attempt_1.outputs.cache_hit != 'true'
+        shell: bash
+        run: rm -rf alire_prefix
+
+      # Next attemp should hit cache given the previous run
+
+      - name: Check action itself (attempt 2)
+        if: steps.attempt_1.outputs.cache_hit != 'true'
+        id: attempt_2
+        uses: ./
+        with:
+          crates: gprbuild hello
+          prefix: alire_prefix
+
+      - name: Diagnose cache use
+        shell: bash
+        run: |
+          echo "Caching attempt 1: ${{steps.attempt_1.outputs.cache_hit}}"
+          echo "Caching attempt 2: ${{steps.attempt_2.outputs.cache_hit}}"
+
+      # Fail if no cache was hit
+      - if: (steps.attempt_1.outputs.cache_hit != 'true') && (steps.attempt_2.outputs.cache_hit != 'true')
+        uses: actions/github-script@v3
+        with:
+          script: |
+              core.setFailed('FAIL: No cache hit observed')
+
+      - name: Run check
+        shell: bash
+        run: |
+          which gprbuild && \
+          gprbuild --version && \
+          hello | grep "Hello, world!"
