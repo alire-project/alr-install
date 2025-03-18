@@ -45,7 +45,7 @@ runs:
 
     - name: Set up alr
       if: steps.find-alr.outputs.available != 'true'
-      uses: alire-project/setup-alire@v4
+      uses: alire-project/setup-alire@v5
       with:
         cache: ${{inputs.cache}}
 
