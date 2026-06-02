@@ -1,5 +1,5 @@
-name: 'alr install'
-description: 'Install using `alr install`'
+name: 'Install with `alr`'
+description: 'Install releases from the Alire community index using `alr install`'
 author: 'Alire Project'
 
 branding:
